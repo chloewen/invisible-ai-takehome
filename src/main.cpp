@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <filesystem>
 #include <sys/stat.h>
+#include <thread>
 using namespace std;
 namespace fs = std::filesystem;
 
@@ -19,7 +20,7 @@ int getCounts(string dataFileName, map<int,int> *counts) {
   if (camFile.is_open()) {
     while (getline(camFile, buf)) {
       int frameIdx;
-      char frameVal[5] ;
+      char frameVal[5];
       const char *bufArr = buf.c_str();
       sscanf(bufArr, "%d, %s", &frameIdx, frameVal);
       // update map with counts
@@ -42,11 +43,10 @@ int main(int argc, char **argv) {
   int numCameras = 0;
   for (const auto & entry : fs::directory_iterator(argv[1])) {
     string dataFileName = entry.path();
-    // cout << dataFileName << endl;
-    if (getCounts(dataFileName, &counts)) {
-      return 1;
-    }
+    thread t(&getCounts, dataFileName, &counts);
+    // if (getCounts(dataFileName, &counts)) return 1;
     numCameras++;
+    t.join();
   }
   
 
