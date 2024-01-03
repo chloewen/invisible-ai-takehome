@@ -8,11 +8,12 @@
 #include <filesystem>
 #include <sys/stat.h>
 #include <thread>
+#include <atomic>
 using namespace std;
 namespace fs = std::filesystem;
 
 
-int getCounts(string dataFileName, map<int,int> *counts) {
+int getCounts(string dataFileName, map<int,atomic<int>> *counts) {
   // open and read camera file
   ifstream camFile;
   camFile.open(dataFileName);
@@ -39,20 +40,13 @@ int getCounts(string dataFileName, map<int,int> *counts) {
 
 int main(int argc, char **argv) {
   // create data structure mapping frame indexes to count
-  map<int,int> counts; 
+  map<int,atomic<int>> counts; 
   int numCameras = 0;
   for (const auto & entry : fs::directory_iterator(argv[1])) {
     string dataFileName = entry.path();
     thread t(&getCounts, dataFileName, &counts);
-    // if (getCounts(dataFileName, &counts)) return 1;
     numCameras++;
     t.join();
-  }
-  
-
-  // print counts (TODO: delete later)
-  for (const auto & pair: counts) {
-    cout << "Key: " << pair.first << ", Value: " << pair.second << endl;
   }
 
   // aggregate results
