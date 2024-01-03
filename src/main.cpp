@@ -5,7 +5,11 @@
 #include <string>
 #include <cstring>
 #include <stdio.h>
+#include <filesystem>
+#include <sys/stat.h>
 using namespace std;
+namespace fs = std::filesystem;
+
 
 int getCounts(string dataFileName, map<int,int> *counts) {
   // open and read camera file
@@ -15,15 +19,13 @@ int getCounts(string dataFileName, map<int,int> *counts) {
   if (camFile.is_open()) {
     while (getline(camFile, buf)) {
       int frameIdx;
-      char *frameVal;
-      char * bufArr = new char[buf.length() + 1];
-      strcpy(bufArr, buf.c_str());
+      char frameVal[5] ;
+      const char *bufArr = buf.c_str();
       sscanf(bufArr, "%d, %s", &frameIdx, frameVal);
       // update map with counts
       if (strncmp(frameVal, "true", 4) == 0) {
         (*counts)[frameIdx]++;
-      }
-      
+      }  
     }
     camFile.close();
   } else {
@@ -35,17 +37,19 @@ int getCounts(string dataFileName, map<int,int> *counts) {
 }
 
 int main(int argc, char **argv) {
-  cout << "test" << argv[1] << endl;
   // create data structure mapping frame indexes to count
   map<int,int> counts; 
-  int numCameras = 6; // TODO: fix
-  for (int i = 0; i < numCameras; i++) {
-    string dataFileName = string(argv[1]) + "/cam" + to_string(i) + ".txt";
+  int numCameras = 0;
+  for (const auto & entry : fs::directory_iterator(argv[1])) {
+    string dataFileName = entry.path();
+    // cout << dataFileName << endl;
     if (getCounts(dataFileName, &counts)) {
       return 1;
     }
+    numCameras++;
   }
   
+
   // print counts (TODO: delete later)
   for (const auto & pair: counts) {
     cout << "Key: " << pair.first << ", Value: " << pair.second << endl;
