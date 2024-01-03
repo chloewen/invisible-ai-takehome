@@ -12,8 +12,10 @@
 using namespace std;
 namespace fs = std::filesystem;
 
-
-int getCounts(string dataFileName, map<int,atomic<int>> *counts) {
+// dataFileName: path to a camera output file
+// counts: pointer to counts map created in main()
+// updateCounts() reads the output in dataFileName and updates counts accordingly
+int updateCounts(string dataFileName, map<int,atomic<int>> *counts) {
   // open and read camera file
   ifstream camFile;
   camFile.open(dataFileName);
@@ -41,12 +43,13 @@ int getCounts(string dataFileName, map<int,atomic<int>> *counts) {
 int main(int argc, char **argv) {
   // create data structure mapping frame indexes to count
   map<int,atomic<int>> counts; 
-  int numCameras = 0;
+  int numCameras = 0; // for overall counts
+  // spawn new thread per camera
   for (const auto & entry : fs::directory_iterator(argv[1])) {
     string dataFileName = entry.path();
-    thread t(&getCounts, dataFileName, &counts);
+    thread t(&updateCounts, dataFileName, &counts);
     numCameras++;
-    t.join();
+    t.join(); // thread needs to finish executing before main starts aggregating data
   }
 
   // aggregate results
@@ -65,6 +68,7 @@ int main(int argc, char **argv) {
     }
   }
 
+  // print output
   cout << "Frames with majority true: " << majTrueCount << endl;
   cout << "Frames with any true: " << anyTrueCount << endl;
   cout << "Frames with all true: " << allTrueCount << endl;
