@@ -3,18 +3,26 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <cstring>
+#include <stdio.h>
 using namespace std;
 
 int getCounts(string dataFileName, unordered_map<int,int> *counts) {
   // open and read camera file
   ifstream camFile;
   camFile.open(dataFileName);
-  string frame;
+  string buf;
   if ( camFile.is_open() ) {
-    while ( camFile ) {
-      getline(camFile, frame);
-      cout << frame << '\n';
+    while (getline(camFile, buf)) {
+      
+      int frameIdx;
+      char *frameVal;
+      char * bufArr = new char[buf.length() + 1];
+      strcpy(bufArr, buf.c_str());
+      sscanf(bufArr, "%d, %s", &frameIdx, frameVal);
+      cout << buf << frameIdx << frameVal << '\n';
     }
+    camFile.close();
   } else {
     cout << "Couldn't open file\n";
     return 1;
