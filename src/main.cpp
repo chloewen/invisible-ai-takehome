@@ -9,8 +9,11 @@
 #include <sys/stat.h>
 #include <thread>
 #include <atomic>
+#include <mutex>
 using namespace std;
 namespace fs = std::filesystem;
+
+mutex counts_map_mutex; 
 
 // dataFileName: path to a camera output file
 // counts: pointer to counts map created in main()
@@ -28,6 +31,7 @@ int updateCounts(string dataFileName, map<int,atomic<int>> *counts) {
       sscanf(bufArr, "%d, %s", &frameIdx, frameVal);
       // update map with counts
       if (strncmp(frameVal, "true", 4) == 0) {
+        std::lock_guard<mutex> guard(counts_map_mutex); // lock counts with every insert
         (*counts)[frameIdx]++;
       }  
     }
@@ -39,6 +43,7 @@ int updateCounts(string dataFileName, map<int,atomic<int>> *counts) {
 
   return 0;
 }
+
 
 int main(int argc, char **argv) {
   // create data structure mapping frame indexes to count
