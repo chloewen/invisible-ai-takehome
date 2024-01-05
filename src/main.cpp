@@ -20,10 +20,18 @@ mutex counts_map_mutex;
 class CameraBase {
   public: 
     string dataFileName;
+    // takes in a path to a data file, outputs a vector of frame indexes that were marked true
     virtual vector<int> readData(string dataFileName) {throw logic_error("Not implemented");};
-    virtual void updateCounts(vector<int> trueFrameIdxs, map<int,int>* counts) {throw logic_error("Not implemented");};
+    // takes in a list of frame indexes that were marked true and updates the counts map accordingly 
+    void updateCounts(vector<int> trueFrameIdxs, map<int,int> *counts) {
+      for (auto i = trueFrameIdxs.begin(); i != trueFrameIdxs.end(); i++) {
+        std::lock_guard<mutex> guard(counts_map_mutex); // lock counts with every insert
+        (*counts)[*i]++;
+      }
+    }
 };
 
+// Objects of CameraDerived type must pass in their own readData()functions 
 class CameraDerived : public CameraBase {
   public: 
     vector<int> readData(string dataFileName) {
@@ -47,15 +55,9 @@ class CameraDerived : public CameraBase {
       }
       return trueFrameIdxs;
     }
-
-    void updateCounts(vector<int> trueFrameIdxs, map<int,int> *counts) {
-      for (auto i = trueFrameIdxs.begin(); i != trueFrameIdxs.end(); i++) {
-        std::lock_guard<mutex> guard(counts_map_mutex); // lock counts with every insert
-        (*counts)[*i]++;
-      }
-    }
 };
 
+// reads the data from the specified camera and updates the counts map
 void processCamera(CameraDerived camera, map<int,int> *counts) {
   vector<int> trueFrameIdxs = camera.readData(camera.dataFileName);
   camera.updateCounts(trueFrameIdxs, counts);
