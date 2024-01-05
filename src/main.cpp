@@ -10,49 +10,67 @@
 #include <thread>
 #include <atomic>
 #include <mutex>
+#include <functional>
+#include <vector>
 using namespace std;
 namespace fs = std::filesystem;
 
 mutex counts_map_mutex; 
 
-// dataFileName: path to a camera output file
-// counts: pointer to counts map created in main()
-// updateCounts() reads the output in dataFileName and updates counts accordingly
-int updateCounts(string dataFileName, map<int,atomic<int>> *counts) {
-  // open and read camera file
-  ifstream camFile;
-  camFile.open(dataFileName);
-  string buf;
-  if (camFile.is_open()) {
-    while (getline(camFile, buf)) {
-      int frameIdx;
-      char frameVal[5];
-      const char *bufArr = buf.c_str();
-      sscanf(bufArr, "%d, %s", &frameIdx, frameVal);
-      // update map with counts
-      if (strncmp(frameVal, "true", 4) == 0) {
-        std::lock_guard<mutex> guard(counts_map_mutex); // lock counts with every insert
-        (*counts)[frameIdx]++;
-      }  
+class CameraBase {
+  public: 
+    string dataFileName;
+    virtual vector<int> readData(string dataFileName) {throw logic_error("Not implemented");};
+    virtual void updateCounts(vector<int> trueFrameIdxs, map<int,int>* counts) {throw logic_error("Not implemented");};
+};
+
+class CameraDerived : public CameraBase {
+  public: 
+    vector<int> readData(string dataFileName) {
+      ifstream camFile;
+      camFile.open(dataFileName);
+      string buf;
+      vector<int> trueFrameIdxs; 
+      if (camFile.is_open()) {
+        while (getline(camFile, buf)) {
+          int frameIdx;
+          char frameVal[5];
+          const char *bufArr = buf.c_str();
+          sscanf(bufArr, "%d, %s", &frameIdx, frameVal);
+          if (strncmp(frameVal, "true", 4) == 0) {
+            trueFrameIdxs.push_back(frameIdx);
+          }  
+        }
+        camFile.close();
+      } else {
+        cout << "Couldn't open file\n";
+      }
+      return trueFrameIdxs;
     }
-    camFile.close();
-  } else {
-    cout << "Couldn't open file\n";
-    return 1;
-  }
 
-  return 0;
+    void updateCounts(vector<int> trueFrameIdxs, map<int,int> *counts) {
+      for (auto i = trueFrameIdxs.begin(); i != trueFrameIdxs.end(); i++) {
+        std::lock_guard<mutex> guard(counts_map_mutex); // lock counts with every insert
+        (*counts)[*i]++;
+      }
+    }
+};
+
+void processCamera(CameraDerived camera, map<int,int> *counts) {
+  vector<int> trueFrameIdxs = camera.readData(camera.dataFileName);
+  camera.updateCounts(trueFrameIdxs, counts);
 }
-
 
 int main(int argc, char **argv) {
   // create data structure mapping frame indexes to count
-  map<int,atomic<int>> counts; 
+  map<int,int> counts; 
   int numCameras = 0; // for overall counts
   // spawn new thread per camera
   for (const auto & entry : fs::directory_iterator(argv[1])) {
     string dataFileName = entry.path();
-    thread t(&updateCounts, dataFileName, &counts);
+    CameraDerived camera;
+    camera.dataFileName = dataFileName;
+    thread t(&processCamera, camera, &counts);
     numCameras++;
     t.join(); // thread needs to finish executing before main starts aggregating data
   }
